@@ -1,0 +1,210 @@
+#include <windows.h>
+#include <string>
+#include <vector>
+#include <ctime>
+#include <shellapi.h>
+
+#define WM_TRAYICON (WM_USER + 1)
+NOTIFYICONDATA nid = {0};
+HMENU hTrayMenu = NULL;
+
+HHOOK g_hHook = NULL;
+bool ctrlPressed = false;
+bool altPressed = false;
+bool progTyping = false;
+std::time_t lastT = 0;
+std::vector<std::pair<UINT, bool>> lastInput;
+
+LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
+    if (progTyping) return CallNextHookEx(g_hHook, nCode, wParam, lParam);
+
+    if (nCode == HC_ACTION) {
+        KBDLLHOOKSTRUCT* p = (KBDLLHOOKSTRUCT*)lParam;
+        // Ignore injected (SendInput) events
+        if (p->flags & LLKHF_INJECTED) return CallNextHookEx(g_hHook, nCode, wParam, lParam);
+        // Track modifier keys
+        if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
+            if (p->vkCode == VK_CONTROL || p->vkCode == VK_LCONTROL || p->vkCode == VK_RCONTROL) ctrlPressed = true;
+            if (p->vkCode == VK_MENU || p->vkCode == VK_LMENU || p->vkCode == VK_RMENU) altPressed = true;
+        }
+        if (wParam == WM_KEYUP || wParam == WM_SYSKEYDOWN) {
+            //printf("vkCode: 0x%02X \n", p->vkCode);
+            // Check for Ctrl+Alt+int(1-5)
+            if (ctrlPressed && altPressed && (p->vkCode == 0x31 || p->vkCode == 0x32 || p->vkCode == 0x33 
+                             || p->vkCode == 0x34 || p->vkCode == 0x35 || p->vkCode == 0x14 )) { // 0x31 is '1'
+                progTyping=true;
+                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+                keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
+                keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0);
+                //Backspace Word
+                for (size_t i = 0; i < lastInput.size(); i++) {
+                    keybd_event(VK_BACK, 0, 0, 0); keybd_event(VK_BACK, 0, KEYEVENTF_KEYUP, 0);
+                }
+
+                //anticaps
+                if (p->vkCode == 0x14) {
+                    keybd_event(0x14, 0, 0, 0); keybd_event(0x14, 0, KEYEVENTF_KEYUP, 0);
+                } else {
+                    //Switch language to index
+                    int index = p->vkCode - 0x31;
+                    int count = GetKeyboardLayoutList(0, NULL);
+                    if (count >= 0) {
+                        std::vector<HKL> layouts(count);
+                        GetKeyboardLayoutList(count, layouts.data());
+                        if (index >= 0 && index < count) {
+                            HKL hkl = layouts[index];
+                            HWND hwnd = GetForegroundWindow();
+                            PostMessage(hwnd, WM_INPUTLANGCHANGEREQUEST, 0, (LPARAM)hkl);
+                        }
+                    }
+                }
+                
+                //Retype Word
+                for (size_t i = 0; i < lastInput.size(); ++i) {
+                    printf("  [%zu] vkCode: 0x%02X (%d), shift: %s\n",i, lastInput[i].first, lastInput[i].first, lastInput[i].second ? "true" : "false");
+                    if (lastInput[i].second == true) keybd_event(VK_SHIFT, 0, 0, 0);
+                    keybd_event(lastInput[i].first, 0, 0, 0);
+                    keybd_event(lastInput[i].first, 0, KEYEVENTF_KEYUP, 0);
+                    if (lastInput[i].second == true) keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0);
+                }
+
+                //lastInput.clear();
+                lastT = static_cast<int>(std::time(nullptr));                
+                
+                if (p->vkCode == VK_CONTROL || p->vkCode == VK_LCONTROL || p->vkCode == VK_RCONTROL) ctrlPressed = false;
+                if (p->vkCode == VK_MENU || p->vkCode == VK_LMENU || p->vkCode == VK_RMENU) altPressed = false;
+                progTyping=false;
+                return CallNextHookEx(g_hHook, nCode, wParam, lParam);
+            }
+
+            // Only process alphabetic (A-Z) and digit (0-9) keys
+            //if ((p->vkCode >= 0x41 && p->vkCode <= 0x5A) || (p->vkCode >= 0x30 && p->vkCode <= 0x39)) {
+            if (
+                // A-Z
+                (p->vkCode >= 0x41 && p->vkCode <= 0x5A) ||
+                // 0-9 (main)
+                (p->vkCode >= 0x30 && p->vkCode <= 0x39) ||
+                // Numpad 0-9
+                (p->vkCode >= VK_NUMPAD0 && p->vkCode <= VK_NUMPAD9) ||
+                // Symbols: - = [ ] \ ; ' , . / (main keyboard)
+                p->vkCode == VK_OEM_MINUS    || // -
+                p->vkCode == VK_OEM_PLUS     || // =
+                p->vkCode == VK_OEM_4        || // [
+                p->vkCode == VK_OEM_6        || // ]
+                p->vkCode == VK_OEM_5        || // '\'
+                p->vkCode == VK_OEM_1        || // ;
+                p->vkCode == VK_OEM_7        || // '
+                p->vkCode == VK_OEM_COMMA    || // ,
+                p->vkCode == VK_OEM_PERIOD   || // .
+                p->vkCode == VK_OEM_2        || // /
+                // Numpad symbols: / * - + .
+                p->vkCode == VK_DIVIDE       || // Numpad /
+                p->vkCode == VK_MULTIPLY     || // Numpad *
+                p->vkCode == VK_SUBTRACT     || // Numpad -
+                p->vkCode == VK_ADD          || // Numpad +
+                p->vkCode == VK_DECIMAL         // Numpad .
+            ) {
+
+                int nowT = static_cast<int>(std::time(nullptr));
+                if (nowT - lastT > 2) {
+                    lastInput.clear(); 
+                    printf("clear\n"); 
+                }
+                lastT = nowT;
+                bool shiftPressed = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+                lastInput.push_back({p->vkCode, shiftPressed});
+            }
+        }
+    }
+    return CallNextHookEx(g_hHook, nCode, wParam, lParam);
+}
+
+void ShowAbout(HWND hwnd) {
+    MessageBoxW(hwnd,
+        L"simKeyTrans\n\n\
+A simple Windows keyboard translator.\n\
+If you suffer from an inappropriate keyboard layout when entering text or logins / passwords,\
+then just press:\
+ctrl+alt+1, ctrl+alt+2,...ctrl+alt+9 or ctrl+alt+capslockn\n\
+Yes, this program uses SetWindowsHookExW and your antivirus will not like it, \
+but I wrote it for myself and you can look at its code so \
+you can make sure that there is nothing suspicious there.\
+Just add an exception to the antivirus on the directory and place this program in it.\
+\n\n(c) 2025 Simich",
+        L"About simKeyTrans",
+        MB_OK | MB_ICONINFORMATION);
+}
+
+// In TrayWndProc, handle the About menu item:
+LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_TRAYICON:
+        if (lParam == WM_RBUTTONUP) {
+            POINT pt;
+            GetCursorPos(&pt);
+            SetForegroundWindow(hwnd);
+            TrackPopupMenu(hTrayMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+        }
+        break;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == 1) { // About menu item
+            ShowAbout(hwnd);
+        } else if (LOWORD(wParam) == 2) { // Exit menu item
+            Shell_NotifyIcon(NIM_DELETE, &nid);
+            PostQuitMessage(0);
+        }
+        break;
+    case WM_DESTROY:
+        Shell_NotifyIcon(NIM_DELETE, &nid);
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
+
+    //add Console for debugging    
+    //AllocConsole();
+    //freopen("CONOUT$", "w", stdout);
+
+    // Register a window class for the tray icon
+    WNDCLASSW wc = {};
+    wc.lpfnWndProc = TrayWndProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = L"SimKeyTransTrayClass";
+    RegisterClassW(&wc);
+
+    HWND hwnd = CreateWindowExW(0, L"SimKeyTransTrayClass", L"SimKeyTrans", 0,
+        0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL);
+
+    // Add tray icon
+    nid.cbSize = sizeof(nid);
+    nid.hWnd = hwnd;
+    nid.uID = 1;
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    nid.uCallbackMessage = WM_TRAYICON;
+    nid.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    //wcscpy_s(nid.szTip, L"SimKeyTrans");
+    Shell_NotifyIcon(NIM_ADD, &nid);
+
+    // Create tray menu
+    hTrayMenu = CreatePopupMenu();
+    AppendMenuW(hTrayMenu, MF_STRING, 1, L"About");
+    AppendMenuW(hTrayMenu, MF_STRING, 2, L"Exit");
+
+    MSG msg;
+    g_hHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
+    if (!g_hHook) {
+        MessageBoxW(NULL, L"Failed to install keyboard hook.", L"Error", MB_ICONERROR);
+        return 1;
+    }
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+    UnhookWindowsHookEx(g_hHook);
+    return 0;
+}
