@@ -34,6 +34,8 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
             // Check for Ctrl+Alt+int(1-5)
             if (ctrlPressed && altPressed && (p->vkCode == 0x31 || p->vkCode == 0x32 || p->vkCode == 0x33 
                              || p->vkCode == 0x34 || p->vkCode == 0x35 || p->vkCode == 0x14 )) { // 0x31 is '1'
+
+                ctrlPressed = false; altPressed = false;
                 progTyping=true;
                 keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
                 keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
@@ -71,10 +73,8 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
                 }
 
                 //lastInput.clear();
-                lastT = static_cast<int>(std::time(nullptr));                
+                lastT = static_cast<int>(std::time(nullptr));
                 
-                if (p->vkCode == VK_CONTROL || p->vkCode == VK_LCONTROL || p->vkCode == VK_RCONTROL) ctrlPressed = false;
-                if (p->vkCode == VK_MENU || p->vkCode == VK_LMENU || p->vkCode == VK_RMENU) altPressed = false;
                 progTyping=false;
                 return CallNextHookEx(g_hHook, nCode, wParam, lParam);
             }
