@@ -1,4 +1,4 @@
-# C++ Windows Desktop Application
+# SimKeyTrans
 
 A simple Windows keyboard translator.\n\
 If you suffer from an inappropriate keyboard layout when entering text or logins / passwords,\
