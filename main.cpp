@@ -5,6 +5,8 @@
 #include <shellapi.h>
 
 #define WM_TRAYICON (WM_USER + 1)
+#define IDI_APP_ICON 101
+
 NOTIFYICONDATA nid = {0};
 HMENU hTrayMenu = NULL;
 
@@ -170,11 +172,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     //AllocConsole();
     //freopen("CONOUT$", "w", stdout);
 
+    //process running ?    
+    HANDLE hMutex = CreateMutexW(NULL, FALSE, L"SimKeyTrans");
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        MessageBoxW(NULL, L"SimKeyTrans is already running.", L"Info", MB_OK | MB_ICONINFORMATION);
+        return 0;
+    }
+
     // Register a window class for the tray icon
     WNDCLASSW wc = {};
     wc.lpfnWndProc = TrayWndProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = L"SimKeyTransTrayClass";
+    wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
     RegisterClassW(&wc);
 
     HWND hwnd = CreateWindowExW(0, L"SimKeyTransTrayClass", L"SimKeyTrans", 0,
@@ -186,7 +196,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     nid.uID = 1;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
-    nid.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
     //wcscpy_s(nid.szTip, L"SimKeyTrans");
     Shell_NotifyIcon(NIM_ADD, &nid);
 
