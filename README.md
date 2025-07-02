@@ -8,7 +8,7 @@ Yes, this program uses SetWindowsHookExW and your antivirus will not like it, \
 but I wrote it for myself and you can look at its code so \
 you can make sure that there is nothing suspicious there.\
 Just add an exception to the antivirus on the directory and place this program in it.\
-\n\n(c) 2025 Simich",
+(c) 2025 Simich",
 
 ## Build Instructions
 
