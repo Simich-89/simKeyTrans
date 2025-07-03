@@ -10,6 +10,11 @@ you can make sure that there is nothing suspicious there.
 Just add an exception to the antivirus on the directory and place this program in it.
 (c) 2025 Simich",
 
+## Download .exe or code
+You can find precompiled .exe in release section:
+https://github.com/Simich-89/simKeyTrans/releases/
+Also code is there so you could check it or even build it yourself.
+
 ## Build Instructions
 
 - Make sure you have a C++ compiler (like MinGW or MSVC) installed.
@@ -22,3 +27,4 @@ g++ main.cpp resource.res -O2 -mwindows -static -static-libgcc -static-libstdc++
 ## Run
 
 Double-click `simKeyTrans.exe` or run it from the terminal.
+
