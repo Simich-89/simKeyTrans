@@ -36,7 +36,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
             //printf("vkCode: 0x%02X \n", p->vkCode);
             // Check for Ctrl+Alt+int(1-5)
             if (ctrlPressed && altPressed && (p->vkCode == 0x31 || p->vkCode == 0x32 || p->vkCode == 0x33 
-                             || p->vkCode == 0x34 || p->vkCode == 0x35 || p->vkCode == 0x14 )) { // 0x31 is '1'
+                                           || p->vkCode == 0x34 || p->vkCode == 0x35 || p->vkCode == 0x14 )) { // 0x31 is '1'
 
                 progTyping=true;
                 keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
@@ -161,7 +161,7 @@ void CheckForUpdates(HWND hwnd) {
             for (int i = 0; latest[i]; ++i) if (latest[i] == '\n' || latest[i] == '\r') latest[i] = 0;
             if (strcmp(latest, APP_VERSION) != 0) {
                 MessageBoxW(hwnd, L"A new version is available!\nVisit the GitHub releases page.", L"Update Available", MB_OK | MB_ICONINFORMATION);
-                ShellExecuteW(hwnd, L"open", L"https://github.com/YOUR_USERNAME/YOUR_REPO/releases", NULL, NULL, SW_SHOWNORMAL);
+                ShellExecuteW(hwnd, L"open", L"https://github.com/Simich-89/simKeyTrans/releases/", NULL, NULL, SW_SHOWNORMAL);
             } else {
                 MessageBoxW(hwnd, L"You are using the latest version.", L"No Update", MB_OK | MB_ICONINFORMATION);
             }
