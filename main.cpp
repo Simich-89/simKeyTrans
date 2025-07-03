@@ -3,7 +3,10 @@
 #include <vector>
 #include <ctime>
 #include <shellapi.h>
+#include <urlmon.h>
+#pragma comment(lib, "urlmon.lib")
 
+#define APP_VERSION "0.1.1"
 #define WM_TRAYICON (WM_USER + 1)
 #define IDI_APP_ICON 101
 
@@ -29,13 +32,12 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
             if (p->vkCode == VK_CONTROL || p->vkCode == VK_LCONTROL || p->vkCode == VK_RCONTROL) ctrlPressed = true;
             if (p->vkCode == VK_MENU || p->vkCode == VK_LMENU || p->vkCode == VK_RMENU) altPressed = true;
         }
-        if (wParam == WM_KEYUP || wParam == WM_SYSKEYDOWN) {
+        if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
             //printf("vkCode: 0x%02X \n", p->vkCode);
             // Check for Ctrl+Alt+int(1-5)
             if (ctrlPressed && altPressed && (p->vkCode == 0x31 || p->vkCode == 0x32 || p->vkCode == 0x33 
                              || p->vkCode == 0x34 || p->vkCode == 0x35 || p->vkCode == 0x14 )) { // 0x31 is '1'
 
-                ctrlPressed = false; altPressed = false;
                 progTyping=true;
                 keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
                 keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
@@ -116,6 +118,9 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
                 bool shiftPressed = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
                 lastInput.push_back({p->vkCode, shiftPressed});
             }
+
+            if (ctrlPressed) ctrlPressed=false;
+            if (altPressed) altPressed=false;
         }
     }
     return CallNextHookEx(g_hHook, nCode, wParam, lParam);
@@ -127,7 +132,7 @@ void ShowAbout(HWND hwnd) {
 A simple Windows keyboard translator.\n\
 If you suffer from an inappropriate keyboard layout when entering text or logins / passwords,\
 then just press:\
-ctrl+alt+1, ctrl+alt+2,...ctrl+alt+9 or ctrl+alt+capslockn\n\
+ctrl+alt+1, ctrl+alt+2,...ctrl+alt+9 or ctrl+alt+capslock\n\
 Yes, this program uses SetWindowsHookExW and your antivirus will not like it, \
 but I wrote it for myself and you can look at its code so \
 you can make sure that there is nothing suspicious there.\
@@ -135,6 +140,36 @@ Just add an exception to the antivirus on the directory and place this program i
 \n\n(c) 2025 Simich",
         L"About simKeyTrans",
         MB_OK | MB_ICONINFORMATION);
+}
+
+void CheckForUpdates(HWND hwnd) {
+    // URL to a plain text file with the latest version number
+    const wchar_t* versionUrl = L"https://raw.githubusercontent.com/Simich-89/simKeyTrans/main/version.txt";
+    wchar_t tempPath[MAX_PATH];
+    GetTempPathW(MAX_PATH, tempPath);
+    wcscat_s(tempPath, L"simkeytrans_update.txt");
+
+    HRESULT hr = URLDownloadToFileW(NULL, versionUrl, tempPath, 0, NULL);
+    if (SUCCEEDED(hr)) {
+        FILE* f = nullptr;
+        _wfopen_s(&f, tempPath, L"rt, ccs=UTF-8");
+        if (f) {
+            char latest[32] = {0};
+            fgets(latest, sizeof(latest), f);
+            fclose(f);
+            // Remove newline
+            for (int i = 0; latest[i]; ++i) if (latest[i] == '\n' || latest[i] == '\r') latest[i] = 0;
+            if (strcmp(latest, APP_VERSION) != 0) {
+                MessageBoxW(hwnd, L"A new version is available!\nVisit the GitHub releases page.", L"Update Available", MB_OK | MB_ICONINFORMATION);
+                ShellExecuteW(hwnd, L"open", L"https://github.com/YOUR_USERNAME/YOUR_REPO/releases", NULL, NULL, SW_SHOWNORMAL);
+            } else {
+                MessageBoxW(hwnd, L"You are using the latest version.", L"No Update", MB_OK | MB_ICONINFORMATION);
+            }
+        }
+        DeleteFileW(tempPath);
+    } else {
+        MessageBoxW(hwnd, L"Could not check for updates.", L"Error", MB_OK | MB_ICONERROR);
+    }
 }
 
 // In TrayWndProc, handle the About menu item:
@@ -151,7 +186,9 @@ LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
     case WM_COMMAND:
         if (LOWORD(wParam) == 1) { // About menu item
             ShowAbout(hwnd);
-        } else if (LOWORD(wParam) == 2) { // Exit menu item
+        } else if (LOWORD(wParam) == 2) { // Check for Updates menu item
+            CheckForUpdates(hwnd);
+        } else if (LOWORD(wParam) == 3) { // Exit menu item
             Shell_NotifyIcon(NIM_DELETE, &nid);
             PostQuitMessage(0);
         }
@@ -203,7 +240,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Create tray menu
     hTrayMenu = CreatePopupMenu();
     AppendMenuW(hTrayMenu, MF_STRING, 1, L"About");
-    AppendMenuW(hTrayMenu, MF_STRING, 2, L"Exit");
+    AppendMenuW(hTrayMenu, MF_STRING, 2, L"Check for Updates");
+    AppendMenuW(hTrayMenu, MF_STRING, 3, L"Exit");
 
     MSG msg;
     g_hHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);

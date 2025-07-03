@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug simKeyTrans",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/simKeyTrans.exe",
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "miDebuggerPath": "C:/msys64/ucrt64/bin/gdb.exe", // adjust if needed
+            "stopAtEntry": false,
+            "externalConsole": false
+        }
+    ]
+}
