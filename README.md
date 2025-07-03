@@ -1,18 +1,19 @@
 # SimKeyTrans
 
-A simple Windows keyboard translator.
-If you suffer from an inappropriate keyboard layout when entering text or logins / passwords,
-then just press:
-ctrl+alt+1, ctrl+alt+2,...ctrl+alt+9 or ctrl+alt+capslockn
-Yes, this program uses SetWindowsHookExW and your antivirus will not like it,
-but I wrote it for myself and you can look at its code so
-you can make sure that there is nothing suspicious there.
-Just add an exception to the antivirus on the directory and place this program in it.
-(c) 2025 Simich",
+A simple Windows keyboard translator. \n
+If you suffer from an inappropriate keyboard layout when entering text or logins / passwords, \n
+then just press: \n
+ctrl+alt+1, ctrl+alt+2,...ctrl+alt+9 or ctrl+alt+capslock \n
+Yes, this program uses SetWindowsHookExW and your antivirus will not like it, \n
+but I wrote it for myself and you can look at its code so \n
+you can make sure that there is nothing suspicious there. \n
+Just add an exception to the antivirus on the directory and place this program in it. \n
+ \n \n
+(c) 2025 Simich
 
 ## Download .exe or code
-You can find precompiled .exe in release section:
-https://github.com/Simich-89/simKeyTrans/releases/
+You can find precompiled .exe in release section: \n
+https://github.com/Simich-89/simKeyTrans/releases/ \n
 Also code is there so you could check it or even build it yourself.
 
 ## Build Instructions
