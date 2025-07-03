@@ -16,7 +16,7 @@ Just add an exception to the antivirus on the directory and place this program i
 - Use the provided VS Code build task or run the following command in the terminal:
 
 ```
-g++ main.cpp -O2 -mwindows -static -static-libgcc -static-libstdc++ -o simKeyTrans.exe
+g++ windres resource.rc -O coff -o resource.res && g++ main.cpp resource.res -O2 -mwindows -static -static-libgcc -static-libstdc++ -lurlmon -o simKeyTrans.exe
 ```
 
 ## Run
