@@ -144,29 +144,23 @@ Just add an exception to the antivirus on the directory and place this program i
 
 void CheckForUpdates(HWND hwnd) {
     // URL to a plain text file with the latest version number
-    const wchar_t* versionUrl = L"https://raw.githubusercontent.com/Simich-89/simKeyTrans/main/version.txt";
-    wchar_t tempPath[MAX_PATH];
-    GetTempPathW(MAX_PATH, tempPath);
-    wcscat_s(tempPath, L"simkeytrans_update.txt");
-
-    HRESULT hr = URLDownloadToFileW(NULL, versionUrl, tempPath, 0, NULL);
-    if (SUCCEEDED(hr)) {
-        FILE* f = nullptr;
-        _wfopen_s(&f, tempPath, L"rt, ccs=UTF-8");
-        if (f) {
-            char latest[32] = {0};
-            fgets(latest, sizeof(latest), f);
-            fclose(f);
-            // Remove newline
-            for (int i = 0; latest[i]; ++i) if (latest[i] == '\n' || latest[i] == '\r') latest[i] = 0;
-            if (strcmp(latest, APP_VERSION) != 0) {
-                MessageBoxW(hwnd, L"A new version is available!\nVisit the GitHub releases page.", L"Update Available", MB_OK | MB_ICONINFORMATION);
-                ShellExecuteW(hwnd, L"open", L"https://github.com/Simich-89/simKeyTrans/releases/", NULL, NULL, SW_SHOWNORMAL);
-            } else {
-                MessageBoxW(hwnd, L"You are using the latest version.", L"No Update", MB_OK | MB_ICONINFORMATION);
-            }
+    IStream* pStream = nullptr;
+    std::string latest;
+    if (SUCCEEDED(URLOpenBlockingStreamW(0, L"https://raw.githubusercontent.com/Simich-89/simKeyTrans/main/version.txt", &pStream, 0, 0)) && pStream) {
+        char buffer[10];
+        ULONG bytesRead = 0;
+        while (SUCCEEDED(pStream->Read(buffer, sizeof(buffer) - 1, &bytesRead)) && bytesRead > 0) {
+            buffer[bytesRead] = 0;
+            latest += buffer;
         }
-        DeleteFileW(tempPath);
+        pStream->Release();
+        
+        if (strcmp(latest.c_str(), APP_VERSION) != 0) {
+            MessageBoxW(hwnd, L"A new version is available!\nVisit the GitHub releases page.", L"Update Available", MB_OK | MB_ICONINFORMATION);
+            ShellExecuteW(hwnd, L"open", L"https://github.com/Simich-89/simKeyTrans/releases/", NULL, NULL, SW_SHOWNORMAL);
+        } else {
+            MessageBoxW(hwnd, L"You are using the latest version.", L"No Update", MB_OK | MB_ICONINFORMATION);
+        }
     } else {
         MessageBoxW(hwnd, L"Could not check for updates.", L"Error", MB_OK | MB_ICONERROR);
     }

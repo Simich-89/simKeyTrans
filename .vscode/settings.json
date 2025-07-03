@@ -46,6 +46,7 @@
         "text_encoding": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp",
-        "ctime": "cpp"
+        "ctime": "cpp",
+        "chrono": "cpp"
     }
 }
