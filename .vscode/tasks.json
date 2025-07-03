@@ -7,7 +7,7 @@
             "command": "cmd",
             "args": [
                 "/c",
-                "windres resource.rc -O coff -o resource.res && g++ main.cpp resource.res -O0 -g -mwindows -static -static-libgcc -static-libstdc++ -lurlmon -o simKeyTrans.exe"
+                "windres resource.rc -O coff -o resource.res && g++ main.cpp resource.res -O0 -g -mwindows -static -static-libgcc -static-libstdc++ -lurlmon -lole32 -o simKeyTrans.exe"
             ],
             "group": "build",
             "problemMatcher": ["$gcc"]
@@ -18,7 +18,7 @@
             "command": "cmd",
             "args": [
                 "/c",
-                "windres resource.rc -O coff -o resource.res && g++ main.cpp resource.res -O2 -mwindows -static -static-libgcc -static-libstdc++ -lurlmon -o ./release/simKeyTrans.exe"
+                "windres resource.rc -O coff -o resource.res && g++ main.cpp resource.res -O2 -mwindows -static -static-libgcc -static-libstdc++ -lurlmon -lole32 -o ./release/simKeyTrans.exe"
             ],
             "group": "build",
             "problemMatcher": ["$gcc"]

@@ -3,12 +3,19 @@
 #include <vector>
 #include <ctime>
 #include <shellapi.h>
+#include <shlobj.h>
+#include <objbase.h>
+#include <shobjidl.h>
+#include <initguid.h>
 #include <urlmon.h>
 #pragma comment(lib, "urlmon.lib")
 
 #define APP_VERSION "0.1.1"
 #define WM_TRAYICON (WM_USER + 1)
 #define IDI_APP_ICON 101
+
+DEFINE_GUID(IID_IShellLinkW, 0x000214F9, 0x0000, 0x0000, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46);
+DEFINE_GUID(IID_IPersistFile, 0x0000010b, 0x0000, 0x0000, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46);
 
 NOTIFYICONDATA nid = {0};
 HMENU hTrayMenu = NULL;
@@ -19,6 +26,7 @@ bool altPressed = false;
 bool progTyping = false;
 std::time_t lastT = 0;
 std::vector<std::pair<UINT, bool>> lastInput;
+std::wstring shortcutPath = L"";
 
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (progTyping) return CallNextHookEx(g_hHook, nCode, wParam, lParam);
@@ -166,6 +174,39 @@ void CheckForUpdates(HWND hwnd) {
     }
 }
 
+void manageStartup(bool add) {
+    if (!shortcutPath.empty()) {
+        wchar_t exePath[MAX_PATH];
+        GetModuleFileNameW(NULL, exePath, MAX_PATH);
+
+        if (add) {
+            CoInitialize(NULL);
+            IShellLinkW* pShellLink = nullptr;
+            if (SUCCEEDED(CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (void**)&pShellLink))) {
+                pShellLink->SetPath(exePath);
+                pShellLink->SetDescription(L"SimKeyTrans");
+                IPersistFile* pPersistFile = nullptr;
+                if (SUCCEEDED(pShellLink->QueryInterface(IID_IPersistFile, (void**)&pPersistFile))) {
+                    pPersistFile->Save(shortcutPath.c_str(), TRUE);
+                    pPersistFile->Release();
+                }
+                pShellLink->Release();
+                ModifyMenuW(hTrayMenu, 3, MF_BYCOMMAND | MF_STRING, 4, L"Remove from Startup");
+            }
+            CoUninitialize();
+        } else {
+            // Remove the shortcut
+            if (DeleteFileW(shortcutPath.c_str()) == 0) {
+                MessageBoxW(NULL, L"Failed to remove startup shortcut.", L"Error", MB_OK | MB_ICONERROR);
+            } else {
+                ModifyMenuW(hTrayMenu, 4, MF_BYCOMMAND | MF_STRING, 3, L"Add to Startup");
+            }
+        }
+    } else {
+        MessageBoxW(NULL, L"Shortcut path is not set.", L"Error", MB_OK | MB_ICONERROR);
+    }
+}
+
 // In TrayWndProc, handle the About menu item:
 LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -178,11 +219,11 @@ LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         }
         break;
     case WM_COMMAND:
-        if (LOWORD(wParam) == 1) { // About menu item
-            ShowAbout(hwnd);
-        } else if (LOWORD(wParam) == 2) { // Check for Updates menu item
-            CheckForUpdates(hwnd);
-        } else if (LOWORD(wParam) == 3) { // Exit menu item
+        if      (LOWORD(wParam) == 1) ShowAbout(hwnd);
+        else if (LOWORD(wParam) == 2) CheckForUpdates(hwnd);
+        else if (LOWORD(wParam) == 3) manageStartup(true); // Add to Startup
+        else if (LOWORD(wParam) == 4) manageStartup(false); // Remove from Startup
+        else if (LOWORD(wParam) == 9) { // Exit menu item
             Shell_NotifyIcon(NIM_DELETE, &nid);
             PostQuitMessage(0);
         }
@@ -218,8 +259,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
     RegisterClassW(&wc);
 
-    HWND hwnd = CreateWindowExW(0, L"SimKeyTransTrayClass", L"SimKeyTrans", 0,
-        0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL);
+    HWND hwnd = CreateWindowExW(0, L"SimKeyTransTrayClass", L"SimKeyTrans", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL);
 
     // Add tray icon
     nid.cbSize = sizeof(nid);
@@ -228,14 +268,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
     nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
-    //wcscpy_s(nid.szTip, L"SimKeyTrans");
     Shell_NotifyIcon(NIM_ADD, &nid);
 
     // Create tray menu
     hTrayMenu = CreatePopupMenu();
     AppendMenuW(hTrayMenu, MF_STRING, 1, L"About");
     AppendMenuW(hTrayMenu, MF_STRING, 2, L"Check for Updates");
-    AppendMenuW(hTrayMenu, MF_STRING, 3, L"Exit");
+    //Check for startup shortcut
+    wchar_t startupPath[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_STARTUP, NULL, 0, startupPath))) {
+        shortcutPath = std::wstring(startupPath) + L"\\SimKeyTrans.lnk";
+        if (GetFileAttributesW(shortcutPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            AppendMenuW(hTrayMenu, MF_STRING, 3, L"Add to Startup");
+        } else {
+            AppendMenuW(hTrayMenu, MF_STRING, 4, L"Remove from Startup");
+        }
+    }
+    AppendMenuW(hTrayMenu, MF_STRING, 9, L"Exit");
 
     MSG msg;
     g_hHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
