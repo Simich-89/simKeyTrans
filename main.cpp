@@ -75,7 +75,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
                 
                 //Retype Word
                 for (size_t i = 0; i < lastInput.size(); ++i) {
-                    printf("  [%zu] vkCode: 0x%02X (%d), shift: %s\n",i, lastInput[i].first, lastInput[i].first, lastInput[i].second ? "true" : "false");
+                    //printf("  [%zu] vkCode: 0x%02X (%d), shift: %s\n",i, lastInput[i].first, lastInput[i].first, lastInput[i].second ? "true" : "false");
                     if (lastInput[i].second == true) keybd_event(VK_SHIFT, 0, 0, 0);
                     keybd_event(lastInput[i].first, 0, 0, 0);
                     keybd_event(lastInput[i].first, 0, KEYEVENTF_KEYUP, 0);
@@ -116,27 +116,40 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
                 p->vkCode == VK_ADD          || // Numpad +
                 p->vkCode == VK_DECIMAL         // Numpad .
             ) {
-
                 int nowT = static_cast<int>(std::time(nullptr));
-                if (nowT - lastT > 2) {
-                    lastInput.clear(); 
-                    printf("clear\n"); 
+                if (nowT - lastT > 2) { 
+                    lastInput.clear();
+                    //printf("clear 1\n");  
                 }
                 lastT = nowT;
                 bool shiftPressed = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
                 lastInput.push_back({p->vkCode, shiftPressed});
+            } else if (!ctrlPressed && !altPressed) { 
+                //lastInput.clear(); 
+                //printf("clear 2\n"); 
             }
 
-            if (ctrlPressed) ctrlPressed=false;
-            if (altPressed) altPressed=false;
+            if (p->vkCode == VK_CONTROL || p->vkCode == VK_LCONTROL || p->vkCode == VK_RCONTROL) ctrlPressed=false;
+            if (p->vkCode == VK_MENU || p->vkCode == VK_LMENU || p->vkCode == VK_RMENU) altPressed=false;
         }
     }
     return CallNextHookEx(g_hHook, nCode, wParam, lParam);
 }
 
 void ShowAbout(HWND hwnd) {
-    MessageBoxW(hwnd,
-        L"simKeyTrans\n\n\
+
+    std::wstring inputStr = L"Recent input: ";
+    for (const auto& pair : lastInput) {
+        wchar_t buf[16];
+        // Show VK code and if shift was pressed
+        swprintf(buf, 16, L"[0x%02X%s] ", pair.first, pair.second ? L"S" : L"");
+        inputStr += buf;
+    }
+    if (lastInput.empty()) {
+        inputStr += L"(none)";
+    }
+
+    std::wstring aboutMsg = L"simKeyTrans\n\n\
 A simple Windows keyboard translator.\n\
 If you suffer from an inappropriate keyboard layout when entering text or logins / passwords,\
 then just press:\
@@ -145,9 +158,10 @@ Yes, this program uses SetWindowsHookExW and your antivirus will not like it, \
 but I wrote it for myself and you can look at its code so \
 you can make sure that there is nothing suspicious there.\
 Just add an exception to the antivirus on the directory and place this program in it.\
-\n\n(c) 2025 Simich",
-        L"About simKeyTrans",
-        MB_OK | MB_ICONINFORMATION);
+\n\n(c) 2025 Simich \n\n"
++ inputStr + L"\n\n";
+
+    MessageBoxW(hwnd, aboutMsg.c_str(), L"About simKeyTrans", MB_OK | MB_ICONINFORMATION);
 }
 
 void CheckForUpdates(HWND hwnd) {
